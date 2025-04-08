@@ -11,13 +11,14 @@ token = os.getenv('rapidapi_token')
 os.makedirs("log", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('log/spotify_downloader.log'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+
 
 class SpotifySong:
     def __init__(self, song_ID: str): 
