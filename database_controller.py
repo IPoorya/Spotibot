@@ -30,7 +30,7 @@ class DBController:
         if not doc:
             return {"status": "error", "message": "user doesn't exist."}
 
-        if playlist_id in doc['playlists']:
+        if playlist_id in [pl['id'] for pl in doc['playlists']]:
             return {"status": "error", "message": "playlist already exists."}    
 
         playlist = {"id": playlist_id,
@@ -46,7 +46,7 @@ class DBController:
         return {"status": "success"}
             
 
-    def update_playlist(self, user_id: str, playlist_id: str, track_ids: list) _> dict: 
+    def update_playlist(self, user_id: str, playlist_id: str, track_ids: list) -> dict: 
         doc = self.collection.find_one({"user_id": user_id})
         
         if not doc:
@@ -54,22 +54,41 @@ class DBController:
         
         playlists = doc['playlists']
         playlist_index = next((i for i, pl in enumerate(playlists) if pl['id'] == playlist_id), None)
-
-        if not playlist_index:
+        
+        if playlist_index is None:
             return {"status": "error", "message": "playlist doesn't exist."}
-
-        playlists[playlist_index][track_ids] = track_ids
+        
+        playlists[playlist_index]['track_ids'] = track_ids
 
         self.collection.update_one(
                 {"user_id": user_id},
-                {"$set": {"playlists": playlists}
+                {"$set": {"playlists": playlists}}
         )
 
         return {"status": "success"}
 
 
-    def delete_playlist(self, user_id: str, playlist_id: str):
-        pass
+    def delete_playlist(self, user_id: str, playlist_id: str) -> dict:
+        doc = self.collection.find_one({"user_id": user_id})
+        
+        if not doc:
+            return {"status": "error", "message": "user doesn't exist."}
+
+        playlists = doc['playlists']
+        playlist_index = next((i for i, pl in enumerate(playlists) if pl['id'] == playlist_id), None)
+
+        if playlist_index is None:
+            return {"status": "error", "message": "playlist doesn't exist."}
+
+        playlists.pop(playlist_index)
+
+        self.collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"playlists": playlists}}
+        )
+
+        return {"status": "success"}
+
 
     def read_playlist(self, user_id: str, playlist_id: str):
         pass
