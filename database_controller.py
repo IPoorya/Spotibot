@@ -14,7 +14,6 @@ class DBController:
 
     def add_user(self, user_id: str) -> dict:
         doc = {'user_id': user_id,
-               'settings': {},
                'playlists': []
                }
         if not self.collection.find_one({"user_id": user_id}):
@@ -40,19 +39,25 @@ class DBController:
 
         return playlist_index
 
-    def add_playlist(self, user_id: str, playlist_id: str, track_ids: list) -> dict:
+
+    def add_playlist(self, user_id: str, playlist_id: str, track_ids: list, auto_check: bool=False) -> dict:
+        # geting user
         doc = self.get_user(user_id)
         if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
             return doc
-
+        
+        # checking if playlist exists
         if playlist_id in [pl['id'] for pl in doc['playlists']]:
             return {"status": "error", "message": "playlist already exists."}    
 
+        # appending playlist
         playlist = {"id": playlist_id,
+                    "auto_check": auto_check,
                     "track_ids": track_ids
                     }
         doc["playlists"].append(playlist)
         
+        # adding user to the collection
         self.collection.update_one(
                 {"user_id": user_id},
                 {"$set": {"playlists": doc["playlists"]}}
@@ -61,16 +66,42 @@ class DBController:
         return {"status": "success"}
             
 
-    def update_playlist(self, user_id: str, playlist_id: str, track_ids: list) -> dict: 
+    def update_playlist_tracks(self, user_id: str, playlist_id: str, track_ids: list) -> dict: 
+        # getting user
         doc = self.get_user(user_id)
         if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
             return doc
 
+        # getting playlist
         playlist_index = self.get_playlist_index(playlist_id, doc['playlists'])
         if type(playlist_index) == dict and playlist_index.get('status') and playlist_index.get('status') == 'error':
             return playlist_index
         
+        # updating track ids
         doc['playlists'][playlist_index]['track_ids'] = track_ids
+
+        # updating playlists
+        self.collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"playlists": doc['playlists']}}
+        )
+
+        return {"status": "success"}
+
+    
+    def update_playlist_auto_check(self, user_id: str, playlist_id: str, auto_check: bool) -> dict:
+        # getting user
+        doc = self.get_user(user_id)
+        if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
+            return doc
+        
+        # getting playlist
+        playlist_index = self.get_playlist_index(playlist_id, doc['playlists'])
+        if type(playlist_index) == dict and playlist_index.get('status') and playlist_index.get('status') == 'error':
+            return playlist_index
+
+        # updating the auto check
+        doc['playlists'][playlist_index]['auto_check'] = auto_check
 
         self.collection.update_one(
                 {"user_id": user_id},
@@ -81,14 +112,18 @@ class DBController:
 
 
     def delete_playlist(self, user_id: str, playlist_id: str) -> dict:
+        # getting user
         doc = self.get_user(user_id)
         if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
             return doc
-
+        
+        # getting playlists
         playlist_index = self.get_playlist_index(playlist_id, doc['playlists'])
         if type(playlist_index) == dict and playlist_index.get('status') and playlist_index.get('status') == 'error':
             return playlist_index
 
+        
+        # deleting playlist and setting and updating user
         doc['playlists'].pop(playlist_index)
 
         self.collection.update_one(
@@ -100,10 +135,12 @@ class DBController:
 
 
     def get_playlist_track_ids(self, user_id: str, playlist_id: str) -> dict | list:
+        # getting user
         doc = self.get_user(user_id)
         if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
             return doc
-
+        
+        # getting playlist index
         playlist_index = self.get_playlist_index(playlist_id, doc['playlists'])
         if type(playlist_index) == dict and playlist_index.get('status') and playlist_index.get('status') == 'error':
             return playlist_index
@@ -112,6 +149,7 @@ class DBController:
 
 
     def get_playlist_ids(self, user_id: str) -> dict | list: 
+        # getting user
         doc = self.get_user(user_id)
         if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
             return doc
