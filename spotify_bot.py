@@ -56,20 +56,27 @@ async def spotify_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                                          thumbnail=coverpath,
                                          reply_markup=reply_markup)    
 
+
 async def lyrics(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """sends music lyrics when lyrics button clicked."""
+
+    song_id = data.split(":")[1]
+
+    # remove the button
+    await query.edit_message_reply_markup(reply_markup=None)
+
+    lyrics = get_song_lyrics(song_id) or "Lyrics not found."
+    await query.message.reply_text(lyrics)
+
+
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """manages buttons."""
     query = update.callback_query
     await query.answer()
 
     data = query.data
     if data.startswith("song_ID:"):
-        song_id = data.split(":")[1]
-
-        # remove the button
-        await query.edit_message_reply_markup(reply_markup=None)
-
-        lyrics = get_song_lyrics(song_id) or "Lyrics not found."
-        await query.message.reply_text(lyrics)
+        lyrics(update, context)
 
 
 def main() -> None:
@@ -78,7 +85,7 @@ def main() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Entity("url"), spotify_url))
-    application.add_handler(CallbackQueryHandler(lyrics))
+    application.add_handler(CallbackQueryHandler(buttons))
     #application.add_handler(CommandHandler("help", help_command))
 
     # Run the bot until the user presses Ctrl-C
