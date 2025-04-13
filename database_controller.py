@@ -99,9 +99,24 @@ class DBController:
         return {"status": "success"}
 
 
-    def read_playlist(self, user_id: str, playlist_id: str):
-        pass
+    def get_playlist_track_ids(self, user_id: str, playlist_id: str) -> dict | list:
+        doc = self.get_user(user_id)
+        if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
+            return doc
 
-    def get_playlists(self, user_id: str):
-        pass
+        playlist_index = self.get_playlist_index(playlist_id, doc['playlists'])
+        if type(playlist_index) == dict and playlist_index.get('status') and playlist_index.get('status') == 'error':
+            return playlist_index
+        
+        return doc['playlists'][playlist_index]['track_ids']       
+
+
+    def get_playlist_ids(self, user_id: str) -> dict | list: 
+        doc = self.get_user(user_id)
+        if type(doc) == dict and doc.get('status') and doc.get('status') == 'error':
+            return doc
+
+        return [pl['id'] for pl in doc['playlists']]
+
+
 
