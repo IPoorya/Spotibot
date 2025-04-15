@@ -1,0 +1,25 @@
+
+
+services:
+  spotify_bot:
+    build: .
+    container_name: spotify_bot
+    volumes:
+      - .:/app
+    env_file:
+      - ../.env
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: spotify_bot_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
