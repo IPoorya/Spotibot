@@ -1,56 +1,70 @@
-import asyncio
-from playwright.async_api import async_playwright
+import asyncio, logging, os
+from playwright.async_api import async_playwright, Error as PlaywrightError
 
-async def run(playlist_url: str) -> dict: 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        page.set_default_timeout(50000)  # 50 seconds
-        await page.goto(
-                playlist_url                
-        )
-        await page.locator('a[data-testid="internal-track-link"]').first.wait_for()
 
-        # Scroll down to load all tracks
-        last_count = 0
-        links = dict()
-        while True:
-            # Get current track count
-            track_links_locator = page.locator('div[data-testid="playlist-tracklist"] a[data-testid="internal-track-link"]')
-            current_count = await track_links_locator.count()
-            # Get track ids on each scroll
-            for i in range(current_count):
-                href = await track_links_locator.nth(i).get_attribute('href')
-                track_id = href.split('/')[-1]
-                links[track_id] = None
+# Configure logging
+os.makedirs("log", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('log/spotify_scraper.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
-            # If no new tracks were loaded, break the loop
-            if current_count == last_count:
-                break
-                
-            # Update last count
-            last_count = current_count
-            
-            # Scroll to the last visible track to trigger loading more
-            await track_links_locator.nth(current_count - 1).scroll_into_view_if_needed()
-            
-            # Wait a bit for potential new tracks to load
-            await page.wait_for_timeout(1000)
+class SpotifyScraper:
+    def __init__(self):
+        self.browser = None
+        self.page = None
+        self.playwright = None
+
+    async def __aenter__(self):
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch()
+        self.page = await self.browser.new_page()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.browser.close()
+        await self.playwright.stop()
+
+    async def scrape_playlist(self, url): 
+        logging.info(f"Openning URL: {url}")
+        try:
+            self.page.set_default_timeout(50000)
+            await self.page.goto(url)
+            await self.page.locator('a[data-testid="internal-track-link"]').first.wait_for()
+            logging.info("Playlist page loaded.")
+
+            # Scroll down to load all tracks
+            last_count = 0
+            track_ids = dict()
         
-        # Get the last track links
-        track_links_locator = page.locator('div[data-testid="playlist-tracklist"] a[data-testid="internal-track-link"]')
-        count = await track_links_locator.count()
-        
-        for i in range(count):
-            href = await track_links_locator.nth(i).get_attribute('href')
-            # Extract track ID from the URL
-            track_id = href.split('/')[-1]
-            links[track_id] = None
+            while True:
+                track_links_locator = self.page.locator('div[data-testid="playlist-tracklist"] a[data-testid="internal-track-link"]')
+                current_count = await track_links_locator.count()
             
-        for link in links.keys():
-            print(link)
+                for i in range(current_count):
+                    href = await track_links_locator.nth(i).get_attribute('href')
+                    track_id = href.split('/')[-1]
+                    track_ids[track_id] = None
+    
+                logging.info(f"Loaded {current_count} tracks so far.") 
+            
+                if current_count == last_count:
+                    break
 
-        print(len(links), ' tracks collected!')
+                last_count = current_count
+                await track_links_locator.nth(current_count - 1).scroll_into_view_if_needed()
+                await self.page.wait_for_timeout(1000)
 
-        await browser.close()
-        return {"status": "success", "track_ids": links}
+            logging.info(f"Scraping finished. Total tracks: {len(track_ids)}")
+            return {"status": "success", "track_ids": track_ids, "count": len(track_ids)}
+        
+        except PlaywrightError as e:
+            logging.error(f"Unexpected error occured: {e}")
+            return {"status": "error", "message": str(e)}
+
+
